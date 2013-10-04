@@ -21,10 +21,10 @@ type Document interface {
 	CreateCDataNode(string) *CDataNode
 	CreateTextNode(string) *TextNode
 	//CreateCommentNode(string) *CommentNode
-	ParseFragment([]byte, []byte, int) (*DocumentFragment, error)
+	ParseFragment([]byte, []byte, ParseOption) (*DocumentFragment, error)
 
 	DocPtr() unsafe.Pointer
-	DocType() int
+	DocType() NodeType
 	DocRef() Document
 	InputEncoding() []byte
 	OutputEncoding() []byte
@@ -39,36 +39,37 @@ type Document interface {
 	RecursivelyRemoveNamespaces() error
 }
 
-//xml parse option
+type ParseOption int
+
 // See: http://xmlsoft.org/html/libxml-parser.html#xmlParserOption
 const (
-	XML_PARSE_RECOVER    = 1 << 0  // recover on errors
-	XML_PARSE_NOENT      = 1 << 1  // substitute entities
-	XML_PARSE_DTDLOAD    = 1 << 2  // load the external subset
-	XML_PARSE_DTDATTR    = 1 << 3  // default DTD attributes
-	XML_PARSE_DTDVALID   = 1 << 4  // validate with the DTD
-	XML_PARSE_NOERROR    = 1 << 5  // suppress error reports
-	XML_PARSE_NOWARNING  = 1 << 6  // suppress warning reports
-	XML_PARSE_PEDANTIC   = 1 << 7  // pedantic error reporting
-	XML_PARSE_NOBLANKS   = 1 << 8  // remove blank nodes
-	XML_PARSE_SAX1       = 1 << 9  // use the SAX1 interface internally
-	XML_PARSE_XINCLUDE   = 1 << 10 // Implement XInclude substitition
-	XML_PARSE_NONET      = 1 << 11 // Forbid network access
-	XML_PARSE_NODICT     = 1 << 12 // Do not reuse the context dictionnary
-	XML_PARSE_NSCLEAN    = 1 << 13 // remove redundant namespaces declarations
-	XML_PARSE_NOCDATA    = 1 << 14 // merge CDATA as text nodes
-	XML_PARSE_NOXINCNODE = 1 << 15 // do not generate XINCLUDE START/END nodes
-	XML_PARSE_COMPACT    = 1 << 16 // compact small text nodes; no modification of the tree allowed afterwards (will possibly crash if you try to modify the tree)
-	XML_PARSE_OLD10      = 1 << 17 // parse using XML-1.0 before update 5
-	XML_PARSE_NOBASEFIX  = 1 << 18 // do not fixup XINCLUDE xml:base uris
-	XML_PARSE_HUGE       = 1 << 19 // relax any hardcoded limit from the parser
-	XML_PARSE_OLDSAX     = 1 << 20 // parse using SAX2 interface before 2.7.0
-	XML_PARSE_IGNORE_ENC = 1 << 21 // ignore internal document encoding hint
-	XML_PARSE_BIG_LINES  = 1 << 22 // Store big lines numbers in text PSVI field
+	XML_PARSE_RECOVER    ParseOption = 1 << iota // recover on errors
+	XML_PARSE_NOENT                              // substitute entities
+	XML_PARSE_DTDLOAD                            // load the external subset
+	XML_PARSE_DTDATTR                            // default DTD attributes
+	XML_PARSE_DTDVALID                           // validate with the DTD
+	XML_PARSE_NOERROR                            // suppress error reports
+	XML_PARSE_NOWARNING                          // suppress warning reports
+	XML_PARSE_PEDANTIC                           // pedantic error reporting
+	XML_PARSE_NOBLANKS                           // remove blank nodes
+	XML_PARSE_SAX1                               // use the SAX1 interface internally
+	XML_PARSE_XINCLUDE                           // Implement XInclude substitition
+	XML_PARSE_NONET                              // Forbid network access
+	XML_PARSE_NODICT                             // Do not reuse the context dictionnary
+	XML_PARSE_NSCLEAN                            // remove redundant namespaces declarations
+	XML_PARSE_NOCDATA                            // merge CDATA as text nodes
+	XML_PARSE_NOXINCNODE                         // do not generate XINCLUDE START/END nodes
+	XML_PARSE_COMPACT                            // compact small text nodes; no modification of the tree allowed afterwards (will possibly crash if you try to modify the tree)
+	XML_PARSE_OLD10                              // parse using XML-1.0 before update 5
+	XML_PARSE_NOBASEFIX                          // do not fixup XINCLUDE xml:base uris
+	XML_PARSE_HUGE                               // relax any hardcoded limit from the parser
+	XML_PARSE_OLDSAX                             // parse using SAX2 interface before 2.7.0
+	XML_PARSE_IGNORE_ENC                         // ignore internal document encoding hint
+	XML_PARSE_BIG_LINES                          // Store big lines numbers in text PSVI field
 )
 
 //default parsing option: relax parsing
-var DefaultParseOption = XML_PARSE_RECOVER |
+var DefaultParseOption ParseOption = XML_PARSE_RECOVER |
 	XML_PARSE_NONET |
 	XML_PARSE_NOERROR |
 	XML_PARSE_NOWARNING
@@ -86,7 +87,7 @@ type XmlDocument struct {
 	OutEncoding   []byte
 	UnlinkedNodes map[*C.xmlNode]bool
 	XPathCtx      *xpath.XPath
-	Type          int
+	Type          NodeType
 	InputLen      int
 
 	fragments []*DocumentFragment //save the pointers to free them when the doc is freed
@@ -115,7 +116,7 @@ func NewDocument(p unsafe.Pointer, contentLen int, inEncoding, outEncoding []byt
 	return
 }
 
-func Parse(content, inEncoding, url []byte, options int, outEncoding []byte) (doc *XmlDocument, err error) {
+func Parse(content, inEncoding, url []byte, options ParseOption, outEncoding []byte) (doc *XmlDocument, err error) {
 	inEncoding = AppendCStringTerminator(inEncoding)
 	outEncoding = AppendCStringTerminator(outEncoding)
 
@@ -160,7 +161,7 @@ func (document *XmlDocument) DocPtr() (ptr unsafe.Pointer) {
 	return
 }
 
-func (document *XmlDocument) DocType() (t int) {
+func (document *XmlDocument) DocType() (t NodeType) {
 	t = document.Type
 	return
 }
@@ -255,7 +256,7 @@ func (document *XmlDocument) CreateCommentNode(data string) (cdata *CommentNode)
 }
 */
 
-func (document *XmlDocument) ParseFragment(input, url []byte, options int) (fragment *DocumentFragment, err error) {
+func (document *XmlDocument) ParseFragment(input, url []byte, options ParseOption) (fragment *DocumentFragment, err error) {
 	root := document.Root()
 	if root == nil {
 		fragment, err = parsefragment(document, nil, input, url, options)

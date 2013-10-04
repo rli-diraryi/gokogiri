@@ -9,7 +9,7 @@ import (
 type Lexeme int
 
 const (
-	SPACES = iota
+	SPACES Lexeme = iota
 	COMMA
 	UNIVERSAL
 	TYPE
@@ -109,7 +109,7 @@ func init() {
 type Scope int
 
 const (
-	GLOBAL = iota
+	GLOBAL Scope = iota
 	LOCAL
 )
 
